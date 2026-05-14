@@ -1,4 +1,4 @@
-from datasets import load_dataset, load_from_disk, concatenate_datasets
+from datasets import load_dataset, load_from_disk, concatenate_datasets, Dataset
 import time
 import argparse
 
@@ -64,7 +64,7 @@ parser.add_argument(
 parser.add_argument(
     "--batch_size",
     type=int, 
-    default=1000
+    default=100
 )
 
 def prepare_data(args):
@@ -75,6 +75,26 @@ def prepare_data(args):
 
     ### Load tokenizer ###
     tokenizer = get_tokenizer(args.hf_model_name)
+
+    ### Tokenize Dataset Function ###
+    def compute_tokens(examples):
+        
+        tokenized = tokenizer(examples["text"], 
+                              return_attention_mask=False, 
+                              add_special_tokens=True,
+                              max_length=None,
+                              truncation=False)
+
+        ### Chunk Text ###
+        input_ids_list = []
+        for ids in tokenized["input_ids"]:
+            for i in range(0, len(ids), context_length):
+                chunk = ids[i:i+context_length]
+                if len(chunk) < context_length:
+                    chunk = chunk + [tokenizer.pad_token_id] * (context_length - len(chunk))
+                input_ids_list.append(chunk)
+        
+        return {"input_ids": input_ids_list}
 
     ### Load Datasets ###
     if args.large_dataset:
@@ -103,49 +123,65 @@ def prepare_data(args):
 
         ### Concatenate Datasets Together ###
         dataset = concatenate_datasets([fw, fw_edu, wiki])
+        
+        ### Train/Test Split Dataset ###
+        dataset = dataset.train_test_split(test_size=args.test_split_pct, seed=args.dataset_split_seed)
+        
+        ### Tokenize Dataset ###
+        tokenized_data = dataset.map(
+            compute_tokens, 
+            batched=True, 
+            batch_size=args.batch_size,
+            num_proc=args.num_workers, 
+            remove_columns="text"
+        )
+        ### Save Data ###
+        print("Saving to:", path_to_save)
+        tokenized_data.save_to_disk(path_to_save)
 
     else:
-
-        dataset = load_dataset("VTSNLP/vietnamese_curated_dataset", 
+        streaming_dataset = load_dataset("VTSNLP/vietnamese_curated_dataset", 
                                split="train",
                                cache_dir=cache_dir, 
-                               num_proc=args.num_workers)
-        dataset = dataset.remove_columns([col for col in dataset.column_names if col != "text"])
-
-    ### Train/Test Split Dataset ###
-    dataset = dataset.train_test_split(test_size=args.test_split_pct, seed=args.dataset_split_seed)
-
-    ### Tokenize Dataset ###
-    def compute_tokens(examples):
+                               streaming=True)
         
-        tokenized = tokenizer(examples["text"], 
-                              return_attention_mask=False, 
-                              add_special_tokens=True,
-                              max_length=None,
-                              truncation=False)
-
-        ### Chunk Text ###
-        input_ids_list = []
-        for ids in tokenized["input_ids"]:
-            for i in range(0, len(ids), context_length):
-                chunk = ids[i:i+context_length]
-                if len(chunk) < context_length:
-                    chunk = chunk + [tokenizer.pad_token_id] * (context_length - len(chunk))
-                input_ids_list.append(chunk)
+        tokenized_stream = streaming_dataset.map(
+            compute_tokens, 
+            batched=True, 
+            batch_size=args.batch_size,
+            remove_columns=["text"]
+        )
         
-        return {"input_ids": input_ids_list}
-    
-    tokenized_data = dataset.map(
-        compute_tokens, 
-        batched=True, 
-        batch_size=args.batch_size,
-        num_proc=args.num_workers, 
-        remove_columns="text"
-    )
-
-    ### Save Data ###
-    print("Saving to:", path_to_save)
-    tokenized_data.save_to_disk(path_to_save)
+        # Save in chunks to avoid RAM explosion
+        chunk_size = 50000
+        current_chunk = []
+        chunk_idx = 0
+        
+        import os
+        
+        for ex in tokenized_stream:
+            current_chunk.append(ex)
+            if len(current_chunk) >= chunk_size:
+                print(f"Processing chunk {chunk_idx}...")
+                chunk_dataset = Dataset.from_list(current_chunk)
+                chunk_split = chunk_dataset.train_test_split(test_size=args.test_split_pct, seed=args.dataset_split_seed)
+                
+                chunk_path = os.path.join(path_to_save, f"chunk_{chunk_idx}")
+                print(f"Saving chunk {chunk_idx} to {chunk_path}")
+                chunk_split.save_to_disk(chunk_path)
+                
+                chunk_idx += 1
+                current_chunk = []
+                
+        # Save remaining
+        if current_chunk:
+            print(f"Processing final chunk {chunk_idx}...")
+            chunk_dataset = Dataset.from_list(current_chunk)
+            chunk_split = chunk_dataset.train_test_split(test_size=args.test_split_pct, seed=args.dataset_split_seed)
+            
+            chunk_path = os.path.join(path_to_save, f"chunk_{chunk_idx}")
+            print(f"Saving chunk {chunk_idx} to {chunk_path}")
+            chunk_split.save_to_disk(chunk_path)
 
 
 if __name__ == "__main__":
@@ -155,8 +191,20 @@ if __name__ == "__main__":
 
     ### Test that it worked ###
     start = time.time()
-    data = load_from_disk(args.path_to_data_store)
+    import os
+    if os.path.exists(args.path_to_data_store) and os.listdir(args.path_to_data_store):
+        # Find first chunk directory
+        chunks = [d for d in os.listdir(args.path_to_data_store) if d.startswith("chunk_")]
+        if chunks:
+            chunks.sort() # Sort to get chunk_0
+            first_chunk = os.path.join(args.path_to_data_store, chunks[0])
+            data = load_from_disk(first_chunk)
+            print(f"Loaded {chunks[0]} for testing.")
+            print(data)
+        else:
+            print("No chunks found in output directory.")
+    else:
+        print("Output directory does not exist or is empty.")
     end = time.time()
 
     print("Time to Load Dataset", end-start)
-    print(data)

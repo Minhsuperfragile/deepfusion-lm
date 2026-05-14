@@ -9,7 +9,7 @@ from datasets import load_from_disk
 from accelerate import Accelerator
 from tqdm import tqdm
 from tokenizer import get_tokenizer
-import bitsandbytes as bnb
+
 
 
 def parse_args():
@@ -181,13 +181,35 @@ def collate_fn(batch):
     tokens = torch.stack([torch.tensor(b["input_ids"], dtype=torch.long) for b in batch])
     return {"input_ids": tokens}
 
-tokenized_data = load_from_disk(args.path_to_prepped_data)
-train_dataloader = DataLoader(tokenized_data["train"], 
-                              batch_size=mini_batchsize,
-                              collate_fn=collate_fn, 
-                              shuffle=True)
+import glob
+from datasets import concatenate_datasets
 
-eval_dataloader = DataLoader(tokenized_data["test"], 
+chunk_paths = glob.glob(os.path.join(args.path_to_prepped_data, "chunk_*"))
+if not chunk_paths:
+    accelerator.print(f"No chunks found in {args.path_to_prepped_data}, loading as single dataset...")
+    train_paths = [args.path_to_prepped_data]
+    tokenized_data = load_from_disk(args.path_to_prepped_data, keep_in_memory=True)
+    test_dataset = tokenized_data["test"]
+else:
+    # Sort numerically by chunk index
+    chunk_paths.sort(key=lambda x: int(os.path.basename(x).split("_")[-1]))
+    train_paths = chunk_paths
+    
+    accelerator.print(f"Found {len(chunk_paths)} chunks. Loading test sets...")
+    
+    test_datasets = []
+    for p in chunk_paths:
+        test_split_path = os.path.join(p, "test")
+        if os.path.exists(test_split_path):
+            test_chunk = load_from_disk(test_split_path, keep_in_memory=True)
+        else:
+            chunk = load_from_disk(p, keep_in_memory=True)
+            test_chunk = chunk["test"]
+        test_datasets.append(test_chunk)
+        
+    test_dataset = concatenate_datasets(test_datasets)
+
+eval_dataloader = DataLoader(test_dataset, 
                              batch_size=mini_batchsize,
                              collate_fn=collate_fn, 
                              shuffle=False)
@@ -209,8 +231,8 @@ scheduler = get_scheduler(
 loss_func = nn.CrossEntropyLoss(reduction="none")
 
 ### Prepare Everything ###
-model, optimizer, train_dataloader, eval_dataloader, scheduler = accelerator.prepare(
-    model, optimizer, train_dataloader, eval_dataloader, scheduler
+model, optimizer, eval_dataloader, scheduler = accelerator.prepare(
+    model, optimizer, eval_dataloader, scheduler
 )
 
 ### Start Training ###
@@ -218,6 +240,39 @@ train = True
 completed_steps = 0
 progress_bar = tqdm(range(completed_steps, args.num_training_steps), disable=not accelerator.is_local_main_process)
 
+def get_train_batches(train_paths, epoch_idx):
+    import random
+    import gc
+    import os
+    paths = list(train_paths)
+    if len(paths) > 1:
+        random.seed(42 + epoch_idx)
+        random.shuffle(paths)
+        
+    for p in paths:
+        train_split_path = os.path.join(p, "train")
+        if os.path.exists(train_split_path):
+            train_dataset = load_from_disk(train_split_path, keep_in_memory=True)
+        else:
+            chunk = load_from_disk(p, keep_in_memory=True)
+            train_dataset = chunk["train"] if "train" in chunk else chunk
+        
+        train_dataloader = DataLoader(train_dataset, 
+                                      batch_size=mini_batchsize,
+                                      collate_fn=collate_fn, 
+                                      shuffle=True)
+        train_dataloader = accelerator.prepare_data_loader(train_dataloader)
+        
+        for batch in train_dataloader:
+            yield batch
+            
+        del train_dataloader
+        del train_dataset
+        if 'chunk' in locals():
+            del chunk
+        gc.collect()
+
+epoch = 0
 while train:
 
     ### Keep Track of Accumulated Mini-Steps ###
@@ -226,7 +281,8 @@ while train:
     ### Accumulated Loss ###
     accumulate_loss = 0
     
-    for batch in train_dataloader:        
+    epoch += 1
+    for batch in get_train_batches(train_paths, epoch):        
 
         ### Grab Input IDs ###
         input_ids = batch["input_ids"].to(accelerator.device)
@@ -276,6 +332,10 @@ while train:
             ### Update Scheduler ###
             scheduler.step()
 
+            ### Iterate Progress Bar and Completed Steps ###
+            completed_steps += 1
+            progress_bar.update(1)
+
             ### Log Results!! ###
             if completed_steps % args.logging_steps == 0:
                 
@@ -319,7 +379,7 @@ while train:
 
                     ### Random sample t to mask each token with that probability ###'
                     batch_size, seq_len = input_ids.shape
-                    t = torch.rand(batch_size, 1, device=accelerator.device).expand(batch_size, seq_len)
+                    t = torch.rand(batch_size, 1, device=accelerator.device).expand(batch_size, seq_len).clamp_min(1e-5)
                     mask = torch.bernoulli(t).bool()
 
                     ### Mask Data and Dont Compute Loss for Unmasked Data ###
@@ -354,7 +414,7 @@ while train:
                 log["val_loss"] = log["val_loss"] / num_losses
 
                 ## Print to Console ###
-                logging_string = f"[{completed_steps}/{args.num_training_steps}] Validation Loss: {log["val_loss"]}"
+                logging_string = f"[{completed_steps}/{args.num_training_steps}] Validation Loss: {log['val_loss']}"
         
                 ### Print out Log ###
                 if accelerator.is_main_process:
@@ -386,10 +446,6 @@ while train:
                 if accelerator.is_main_process:
                     progress_bar.write("Completed Training!!")
                 break
-
-            ### Iterate Progress Bar and Completed Steps ###
-            completed_steps += 1
-            progress_bar.update(1)
 
             ### Reset Loss Accumulate For Next Accumulation ###
             accumulate_loss = 0
