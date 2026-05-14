@@ -98,31 +98,31 @@ def prepare_data(args):
 
     ### Load Datasets ###
     if args.large_dataset:
-        fw = load_dataset("HuggingFaceFW/fineweb", 
-                        name="sample-10BT", 
+        dataset = load_dataset("VTSNLP/vietnamese_curated_dataset", 
+ 
                         split="train", 
                         cache_dir=cache_dir,
                         num_proc=args.num_workers)
         
-        fw_edu = load_dataset("HuggingFaceFW/fineweb-edu", 
-                            name="sample-10BT", 
-                            split="train", 
-                            cache_dir=cache_dir,
-                            num_proc=args.num_workers)
+        # fw_edu = load_dataset("HuggingFaceFW/fineweb-edu", 
+        #                     name="sample-10BT", 
+        #                     split="train", 
+        #                     cache_dir=cache_dir,
+        #                     num_proc=args.num_workers)
         
-        wiki = load_dataset("wikimedia/wikipedia", 
-                            "20231101.en",
-                            split="train",
-                            cache_dir=cache_dir,
-                            num_proc=args.num_workers)
+        # wiki = load_dataset("wikimedia/wikipedia", 
+        #                     "20231101.en",
+        #                     split="train",
+        #                     cache_dir=cache_dir,
+        #                     num_proc=args.num_workers)
         
-        ### Remove All Columns that are Not Text ###
-        fw = fw.remove_columns([col for col in fw.column_names if col != "text"])
-        fw_edu = fw_edu.remove_columns([col for col in fw_edu.column_names if col != "text"])
-        wiki = wiki.remove_columns([col for col in wiki.column_names if col != "text"])
+        # ### Remove All Columns that are Not Text ###
+        # fw = fw.remove_columns([col for col in fw.column_names if col != "text"])
+        # fw_edu = fw_edu.remove_columns([col for col in fw_edu.column_names if col != "text"])
+        # wiki = wiki.remove_columns([col for col in wiki.column_names if col != "text"])
 
-        ### Concatenate Datasets Together ###
-        dataset = concatenate_datasets([fw, fw_edu, wiki])
+        # ### Concatenate Datasets Together ###
+        # dataset = concatenate_datasets([fw, fw_edu, wiki])
         
         ### Train/Test Split Dataset ###
         dataset = dataset.train_test_split(test_size=args.test_split_pct, seed=args.dataset_split_seed)

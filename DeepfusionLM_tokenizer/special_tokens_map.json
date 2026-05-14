@@ -1,0 +1,31 @@
+{
+  "additional_special_tokens": [
+    {
+      "content": "[START_ID]",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false
+    },
+    {
+      "content": "[END_ID]",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false
+    },
+    {
+      "content": "[EOT]",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false
+    }
+  ],
+  "bos_token": "[BOS]",
+  "cls_token": "[BOS]",
+  "eos_token": "[EOS]",
+  "mask_token": "[MASK]",
+  "pad_token": "[EOS]",
+  "unk_token": "[UNK]"
+}

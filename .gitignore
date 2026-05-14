@@ -2,6 +2,7 @@
 __pycache__/
 hf_cache/
 data/
+tokenized_vietnamese_book/
 
 *.py[codz]
 *$py.class

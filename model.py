@@ -10,11 +10,12 @@ import torch.nn as nn
 
 @dataclass
 class DeepfusionConfig:
-    vocab_size : int = 1024
+    vocab_size : int = 8192
     embedding_dim : int = 768
     hidden_dim: int = 768
     sliding_attn_size: int = 128 # = -1 for global attn
     num_attn_layers = 9
+    # "[UNK]", "[START_ID]", "[END_ID]", "[EOT]", "[MASK]", "[BOS]", "[EOS]"
 
     ratio_global_window = 3
     pad_token : int = 0
