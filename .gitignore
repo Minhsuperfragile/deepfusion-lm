@@ -3,6 +3,8 @@ __pycache__/
 hf_cache/
 data/
 tokenized_vietnamese_book/
+checkpoints/
+*.ipynb
 
 *.py[codz]
 *$py.class

@@ -5,6 +5,9 @@ from tokenizers.pre_tokenizers import Whitespace
 from model import DeepfusionConfig
 import os
 
+from dotenv import load_dotenv
+load_dotenv()
+
 CONFIG=DeepfusionConfig()
 
 # 1. Initialize the Tokenizer with an empty BPE model
@@ -39,7 +42,7 @@ def get_training_corpus(path):
                     yield line
 
 # 5. Train the Tokenizer
-corpus_path = "G:\\hf\\vietnamese-book"
+corpus_path = os.getenv("CORPUS_PATH", "")
 print("Training started...")
 tokenizer.train_from_iterator(get_training_corpus(corpus_path), trainer=trainer)
 print("Training complete!")

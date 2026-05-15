@@ -14,7 +14,7 @@ class DeepfusionConfig:
     embedding_dim : int = 768
     hidden_dim: int = 768
     sliding_attn_size: int = 128 # = -1 for global attn
-    num_attn_layers = 9
+    num_attn_layers = 22
     # "[UNK]", "[START_ID]", "[END_ID]", "[EOT]", "[MASK]", "[BOS]", "[EOS]"
 
     ratio_global_window = 3
@@ -92,12 +92,16 @@ class MultiheadAttentionWithRoPE(nn.Module):
         # pairwise distance
         dist = idx[None, :] - idx[:, None]
 
-        # causal + local
-        mask = (dist > 0) | (dist < -self.window_size)
+        # causal mask (future tokens)
+        mask = (dist > 0)
+        
+        # local mask (sliding window) if not global
+        if self.window_size != -1:
+            mask = mask | (dist < -self.window_size)
 
         return mask
 
-    def forward(self, x:torch.Tensor, pre_norm = True):
+    def forward(self, x:torch.Tensor, pre_norm = True, attention_mask = None):
         batch_size, seq_len, _ = x.shape
 
         if pre_norm: 
@@ -119,7 +123,10 @@ class MultiheadAttentionWithRoPE(nn.Module):
         k = k.transpose(1, 2)
         v = v.transpose(1, 2)
         
-        mask = self.sliding_window_mask(seq_len, x.device) if self.window_size == -1 else None
+        # Combine sliding window mask and optional attention_mask
+        mask = self.sliding_window_mask(seq_len, x.device)
+        # if attention_mask is not None:
+        #     mask = attention_mask
         
         # SDPA returns (batch, heads, seq_len, head_dim)
         attention = f.scaled_dot_product_attention(
@@ -161,8 +168,8 @@ class DeepfusionAttentionLayer(nn.Module):
         self.mlp_norm = nn.LayerNorm(config.hidden_dim, eps = config.layer_norm_eps, elementwise_affine=True)
         self.mlp = DeepfusionMLP(config)
 
-    def forward(self, x, pre_norm = True):
-        x = self.multi_head_attention(x, pre_norm)
+    def forward(self, x, pre_norm = True, attention_mask = None):
+        x = self.multi_head_attention(x, pre_norm, attention_mask = attention_mask)
         x = self.mlp_norm(x)
         x = self.mlp(x)
         return x
@@ -197,10 +204,17 @@ class DeepfusionEmbedding(nn.Module):
 class DeepfusionDecoderHead(nn.Module):
     def __init__(self,config):
         super().__init__()
-        self.fc = nn.Linear(config.hidden_dim ,config.vocab_size)
+        self.dense = nn.Linear(config.hidden_dim, config.hidden_dim, bias=False)
+        self.layer_norm = nn.LayerNorm(config.hidden_dim, eps = config.layer_norm_eps, elementwise_affine=True)
+        self.gelu = nn.GELU()
+        self.fc = nn.Linear(config.hidden_dim ,config.vocab_size, bias=True)
 
     def forward(self, x): 
-        return self.fc(x) 
+        x = self.dense(x)
+        x = self.gelu(x)
+        x = self.layer_norm(x)
+        x = self.fc(x)
+        return x
 # endregion
 
 class DeepfusionLM(nn.Module):
@@ -225,11 +239,11 @@ class DeepfusionLM(nn.Module):
         config.sliding_attn_size = orig_window_size
         self.lm_head = DeepfusionDecoderHead(config)
 
-    def forward(self, x):
-        x = self.embedding(x)
-        x = self.attention(x, pre_norm=False)
+    def forward(self, input_ids, attention_mask = None):
+        x = self.embedding(input_ids)
+        x = self.attention(x, pre_norm=False, attention_mask = attention_mask)
         for layer in self.attentions:
-            x = layer(x)
+            x = layer(x, attention_mask = attention_mask)
         x = self.lm_head(x)
         return x
 

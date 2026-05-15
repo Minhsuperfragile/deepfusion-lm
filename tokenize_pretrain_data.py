@@ -1,12 +1,15 @@
 import os
 from datasets import load_dataset
-from transformers import PreTrainedTokenizerFast
+from transformers import AutoTokenizer
 from model import DeepfusionConfig
+from tokenizers.processors import TemplateProcessing
+from dotenv import load_dotenv
+load_dotenv()
 
 # 1. Configuration
-corpus_path = "G:\\hf\\vietnamese-book"
-tokenizer_path = "DeepfusionLM_tokenizer.json"
-output_path = "./tokenized_vietnamese_book"
+corpus_path = os.getenv("CORPUS_PATH", "")
+tokenizer_path = os.getenv("TOKENIZER_PATH", "")
+output_path = os.getenv("PROCESSED_PRETRAIN_DATA_PATH", "./tokenized_vietnamese_book")
 
 # Load config to get the correct sequence length
 config = DeepfusionConfig()
@@ -26,13 +29,22 @@ def prepare_tokenized_data():
     # We use PreTrainedTokenizerFast to load the .json file from train_tokenizer.py
     print(f"Loading tokenizer from {tokenizer_path}...")
     if os.path.exists(tokenizer_path):
-        tokenizer = PreTrainedTokenizerFast(tokenizer_file=tokenizer_path)
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
         # Ensure special tokens are recognized by the transformers wrapper
-        tokenizer.pad_token = "[PAD]"
+        tokenizer.pad_token = "[EO]"
         tokenizer.mask_token = "[MASK]"
         tokenizer.unk_token = "[UNK]"
         tokenizer.bos_token = "[BOS]"
         tokenizer.eos_token = "[EOS]"
+
+        tokenizer._tokenizer.post_processor = TemplateProcessing(
+            single = f"{tokenizer.bos_token} $A {tokenizer.eos_token}",
+            special_tokens = [
+                (tokenizer.bos_token, tokenizer.bos_token_id),
+                (tokenizer.eos_token, tokenizer.eos_token_id)
+            ]
+        )
+
     else:
         print(f"Error: {tokenizer_path} not found. Please run train_tokenizer.py first.")
         return
@@ -46,6 +58,8 @@ def prepare_tokenized_data():
         # Concatenate all token IDs in this batch
         all_ids = []
         for ids in outputs["input_ids"]:
+            if len(ids) == 0:
+                continue
             all_ids.extend(ids)
             all_ids.append(tokenizer.eos_token_id) # Add EOS between documents
         
