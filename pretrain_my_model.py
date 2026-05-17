@@ -23,16 +23,16 @@ tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_PATH)
 
 @dataclass
 class PretrainConfig:
-    per_gpu_batch_size: int = 64
+    per_gpu_batch_size: int = 16
     gradient_accumulation_steps: int = 4
     learning_rate: float = 5e-5
     weight_decay: float = 0.01
     lr_scheduler_type: str = 'cosine'
-    num_warmup_steps: int = 2 # 1000
-    num_training_steps: int = 10 # 100_000
+    num_warmup_steps: int = 1000
+    num_training_steps: int = 10000
 
     logging_steps: int = 1
-    checkpoint_interval: int = 250
+    checkpoint_interval: int = 1000
     max_grad_norm: float = 1.0
 
 # Start accelerator 
@@ -178,21 +178,21 @@ while train:
                 
                 accelerator.log(log, step=completed_steps) 
             
-            ### Checkpoint Model (Only need main process for this) ###
-            if (completed_steps % pretrainc.checkpoint_interval == 0):
+            # ### Checkpoint Model (Only need main process for this) ###
+            # if (completed_steps % pretrainc.checkpoint_interval == 0):
                 
-                ### Save Checkpoint ### 
-                path_to_checkpoint = os.path.join(path_to_experiment, f"checkpoint_{completed_steps}")
+            #     ### Save Checkpoint ### 
+            #     path_to_checkpoint = os.path.join(path_to_experiment, f"checkpoint_{completed_steps}")
 
-                if accelerator.is_main_process:
-                    progress_bar.write(f"Saving Checkpoint to {path_to_checkpoint}")
+            #     if accelerator.is_main_process:
+            #         progress_bar.write(f"Saving Checkpoint to {path_to_checkpoint}")
 
-                ### Make sure that all processes have caught up before saving checkpoint! ###
-                accelerator.wait_for_everyone()
+            #     ### Make sure that all processes have caught up before saving checkpoint! ###
+            #     accelerator.wait_for_everyone()
 
-                ### Save checkpoint using only the main process ###
-                if accelerator.is_main_process:
-                    accelerator.save_state(output_dir=path_to_checkpoint)
+            #     ### Save checkpoint using only the main process ###
+            #     if accelerator.is_main_process:
+            #         accelerator.save_state(output_dir=path_to_checkpoint)
             
             if completed_steps >= pretrainc.num_training_steps:
                 train = False

@@ -14,15 +14,15 @@ class DeepfusionConfig:
     embedding_dim : int = 768
     hidden_dim: int = 768
     sliding_attn_size: int = 128 # = -1 for global attn
-    num_attn_layers = 22
+    num_attn_layers = 12
     # "[UNK]", "[START_ID]", "[END_ID]", "[EOT]", "[MASK]", "[BOS]", "[EOS]"
 
     ratio_global_window = 3
     pad_token : int = 0
     layer_norm_eps: float = 1e-5
-    num_heads: int = 64
+    num_heads: int = 32
     rope_base: int = 10_000
-    max_seq_len: int = 2048 # Maximum context length
+    max_seq_len: int = 1024 # Maximum context length
 
 # region RoPE 
 # 1. Helper function to rotate half the dimensions
@@ -86,6 +86,9 @@ class MultiheadAttentionWithRoPE(nn.Module):
         # Out projections 
         self.out_proj = nn.Linear(config.hidden_dim, config.hidden_dim, bias=False)
 
+        # Dropout
+        self.dropout = nn.Dropout(p=0.1)
+        
     def sliding_window_mask(self, seq_len, device="cpu"):
         idx = torch.arange(seq_len, device=device)
 
@@ -139,6 +142,7 @@ class MultiheadAttentionWithRoPE(nn.Module):
         attention = attention.view(batch_size, seq_len, -1)
         
         out = self.out_proj(attention)
+        out = self.dropout(out)
 
         return out
 
@@ -168,10 +172,13 @@ class DeepfusionAttentionLayer(nn.Module):
         self.mlp_norm = nn.LayerNorm(config.hidden_dim, eps = config.layer_norm_eps, elementwise_affine=True)
         self.mlp = DeepfusionMLP(config)
 
-    def forward(self, x, pre_norm = True, attention_mask = None):
-        x = self.multi_head_attention(x, pre_norm, attention_mask = attention_mask)
-        x = self.mlp_norm(x)
-        x = self.mlp(x)
+    def forward(self, x, pre_norm=True, attention_mask = None):
+        # Attention with residual connection
+        # (MultiheadAttentionWithRoPE handles its own pre_norm internally)
+        x = x + self.multi_head_attention(x, pre_norm=pre_norm, attention_mask=attention_mask)
+        
+        # MLP with residual connection
+        x = x + self.mlp(self.mlp_norm(x))
         return x
 
 # endregion
@@ -238,6 +245,7 @@ class DeepfusionLM(nn.Module):
         # Restore original config state
         config.sliding_attn_size = orig_window_size
         self.lm_head = DeepfusionDecoderHead(config)
+        self.apply(_init_weights)
 
     def forward(self, input_ids, attention_mask = None):
         x = self.embedding(input_ids)
@@ -281,6 +289,25 @@ class DeepfusionLM(nn.Module):
             
         return idx
         
+def _init_weights(module):
+    """
+    Standard initialization for Transformer models:
+    - Linear/Embedding weights: Normal(0, 0.02)
+    - LayerNorm: weight=1, bias=0
+    """
+    if isinstance(module, nn.Linear):
+        torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+        if module.bias is not None:
+            torch.nn.init.zeros_(module.bias)
+    elif isinstance(module, nn.Embedding):
+        torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+        if module.padding_idx is not None:
+            with torch.no_grad():
+                module.weight[module.padding_idx].fill_(0)
+    elif isinstance(module, nn.LayerNorm):
+        torch.nn.init.zeros_(module.bias)
+        torch.nn.init.ones_(module.weight)
+
 if __name__ == "__main__": 
     CONFIG = DeepfusionConfig()
 

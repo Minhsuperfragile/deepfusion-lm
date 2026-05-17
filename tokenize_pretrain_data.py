@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # 1. Configuration
-corpus_path = os.getenv("CORPUS_PATH", "")
-tokenizer_path = os.getenv("TOKENIZER_PATH", "")
+corpus_path = os.getenv("CORPUS_PATH", r"G:\hf\vietnamese-book")
+tokenizer_path = os.getenv("TOKENIZER_PATH", "./DeepfusionLM_tokenizer")
 output_path = os.getenv("PROCESSED_PRETRAIN_DATA_PATH", "./tokenized_vietnamese_book")
 
 # Load config to get the correct sequence length

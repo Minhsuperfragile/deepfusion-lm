@@ -1,0 +1,2 @@
+{% for message in messages %}{{ bos_token if loop.first else '' }}{{ '[START_ID]' + message['role'] + '[END_ID]' }}
+{{ message['content'] }}{{ '[EOT]' if message['role'] == 'user' else eos_token }}{% endfor %}{% if add_generation_prompt %}{{ '[START_ID]' + 'assistant' + '[END_ID]' }}{% endif %}

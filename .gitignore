@@ -4,6 +4,8 @@ hf_cache/
 data/
 tokenized_vietnamese_book/
 checkpoints/
+my_experiment/
+
 *.ipynb
 
 *.py[codz]
