@@ -20,7 +20,7 @@ class DeepfusionConfig:
     ratio_global_window = 3
     pad_token : int = 0
     layer_norm_eps: float = 1e-5
-    num_heads: int = 32
+    num_heads: int = 64
     rope_base: int = 10_000
     max_seq_len: int = 1024 # Maximum context length
 
@@ -90,17 +90,18 @@ class MultiheadAttentionWithRoPE(nn.Module):
         self.dropout = nn.Dropout(p=0.1)
         
     def sliding_window_mask(self, seq_len, device="cpu"):
+        if self.window_size == -1:
+            return None
+            
         idx = torch.arange(seq_len, device=device)
 
         # pairwise distance
         dist = idx[None, :] - idx[:, None]
 
-        # causal mask (future tokens)
-        mask = (dist > 0)
-        
-        # local mask (sliding window) if not global
-        if self.window_size != -1:
-            mask = mask | (dist < -self.window_size)
+        # For Masked Language Modeling, we need BIDIRECTIONAL attention.
+        # PyTorch SDPA expects True for elements allowed to participate.
+        # We allow all tokens within the sliding window (both past and future).
+        mask = torch.abs(dist) <= self.window_size
 
         return mask
 
@@ -128,8 +129,17 @@ class MultiheadAttentionWithRoPE(nn.Module):
         
         # Combine sliding window mask and optional attention_mask
         mask = self.sliding_window_mask(seq_len, x.device)
-        # if attention_mask is not None:
-        #     mask = attention_mask
+        
+        if attention_mask is not None:
+            # attention_mask: (batch_size, seq_len), where 1/True is valid token, 0/False is padding
+            pad_mask = attention_mask.bool().unsqueeze(1).unsqueeze(2) # (batch, 1, 1, seq_len)
+            if mask is not None:
+                mask = mask.unsqueeze(0).unsqueeze(0) & pad_mask # (1, 1, seq_len, seq_len) & (batch, 1, 1, seq_len)
+            else:
+                mask = pad_mask
+        else:
+            if mask is not None:
+                mask = mask.unsqueeze(0).unsqueeze(0) # (1, 1, seq_len, seq_len)
         
         # SDPA returns (batch, heads, seq_len, head_dim)
         attention = f.scaled_dot_product_attention(
@@ -237,8 +247,10 @@ class DeepfusionLM(nn.Module):
         for i in range(1, config.num_attn_layers):        
             if i % config.ratio_global_window == 0:
                 config.sliding_attn_size = -1
+                config.rope_base = 160_000
             else:
                 config.sliding_attn_size = orig_window_size
+                config.rope_base = 10_000
             
             self.attentions.append(DeepfusionAttentionLayer(config))
         
@@ -256,38 +268,49 @@ class DeepfusionLM(nn.Module):
         return x
 
     @torch.no_grad()
-    def generate(self, idx, max_new_tokens, temperature=1.0, top_k=None):
+    def fill_mask(self, idx, mask_token_id, temperature=1.0, top_k=None, sample=False):
         """
-        Generates new tokens given a starting sequence (idx).
-        - max_new_tokens: Controls the "Max Output Length"
-        - self.config.max_seq_len: Controls the "Context Length"
+        Predicts and fills [MASK] tokens in the input sequence.
+        - mask_token_id: The ID of the [MASK] token in your vocabulary.
+        - sample: If True, samples from the distribution. If False, takes the argmax (greedy).
         """
         self.eval()
-        for _ in range(max_new_tokens):
-            # Ensure the input doesn't exceed the context length (sliding window)
-            idx_cond = idx if idx.size(1) <= self.config.max_seq_len else idx[:, -self.config.max_seq_len:]
+        
+        # Ensure the input doesn't exceed the max context length
+        idx_cond = idx if idx.size(1) <= self.config.max_seq_len else idx[:, :self.config.max_seq_len]
+        
+        # Forward pass to get logits for all tokens
+        logits = self(idx_cond)
+        
+        # Identify where the mask tokens are in the sequence
+        mask_positions = (idx_cond == mask_token_id)
+        
+        # If no mask tokens are found, return original sequence
+        if not mask_positions.any():
+            return idx_cond
             
-            # Forward pass
-            logits = self(idx_cond)
-            
-            # Focus only on the last token and apply temperature
-            logits = logits[:, -1, :] / temperature
-            
+        # Get logits specifically for the masked positions
+        # shape: (num_masked_tokens, vocab_size)
+        mask_logits = logits[mask_positions] / temperature
+        
+        if sample:
             # Optional: Top-k sampling
             if top_k is not None:
-                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
-                logits[logits < v[:, [-1]]] = -float('Inf')
+                v, _ = torch.topk(mask_logits, min(top_k, mask_logits.size(-1)))
+                mask_logits[mask_logits < v[:, [-1]]] = -float('Inf')
             
-            # Convert to probabilities
-            probs = f.softmax(logits, dim=-1)
+            # Convert to probabilities and sample
+            probs = f.softmax(mask_logits, dim=-1)
+            predicted_tokens = torch.multinomial(probs, num_samples=1).squeeze(-1)
+        else:
+            # Greedy prediction (standard for MLM)
+            predicted_tokens = mask_logits.argmax(dim=-1)
             
-            # Sample the next token
-            idx_next = torch.multinomial(probs, num_samples=1)
-            
-            # Append to the sequence
-            idx = torch.cat((idx, idx_next), dim=1)
-            
-        return idx
+        # Create a copy and fill in the predictions
+        filled_idx = idx_cond.clone()
+        filled_idx[mask_positions] = predicted_tokens
+        
+        return filled_idx
         
 def _init_weights(module):
     """

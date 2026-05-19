@@ -83,8 +83,8 @@ optimizer = torch.optim.AdamW(model.parameters(),
 scheduler = get_scheduler(
     name=pretrainc.lr_scheduler_type,
     optimizer=optimizer,
-    num_warmup_steps=pretrainc.num_warmup_steps * accelerator.num_processes,
-    num_training_steps=pretrainc.num_training_steps * accelerator.num_processes,
+    num_warmup_steps=pretrainc.num_warmup_steps,
+    num_training_steps=pretrainc.num_training_steps,
 )
 
 ### Loss Function ###
@@ -113,14 +113,17 @@ while train:
         ### Grab Input IDs ###
         input_ids = batch["input_ids"].to(accelerator.device)
 
-        ### Attend to All Tokens (Create a mask of False for SDPA) ###
+        ### Create Attention Mask (True for valid tokens, False for padding) ###
         batch_size, seq_len = input_ids.shape
-        # In SDPA, True means 'mask out', so False means 'attend'
-        attention_mask = torch.zeros((batch_size, seq_len), dtype=torch.bool, device=accelerator.device)
+        pad_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else 0
+        attention_mask = (input_ids != pad_id)
 
-        ### Random sample t to mask each token with that probability ###'
+        ### Random sample t to mask each token with that probability ###
         t = torch.rand(batch_size, 1, device=accelerator.device).expand(batch_size, seq_len).clamp_min(1e-5)
         mask = torch.bernoulli(t).bool()
+
+        ### IMPORTANT: Do not mask padding tokens! ###
+        mask = mask & attention_mask
 
         ### Mask Data and Dont Compute Loss for Unmasked Data ###
         masked_input_ids = input_ids.masked_fill(mask, tokenizer.mask_token_id)
@@ -142,7 +145,7 @@ while train:
 
         ### Scale Loss by Gradient Accumulation Steps ###
         loss = loss / pretrainc.gradient_accumulation_steps
-        accumulate_loss += loss
+        accumulate_loss += loss.detach()
 
         ### Compute Gradients ###
         accelerator.backward(loss)
