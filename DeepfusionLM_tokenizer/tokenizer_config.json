@@ -1,16 +1,75 @@
 {
-  "backend": "tokenizers",
-  "bos_token": "[BOS]",
-  "cls_token": "[BOS]",
-  "eos_token": "[EOS]",
-  "extra_special_tokens": [
+  "added_tokens_decoder": {
+    "0": {
+      "content": "[UNK]",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "1": {
+      "content": "[START_ID]",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "2": {
+      "content": "[END_ID]",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "3": {
+      "content": "[EOT]",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "4": {
+      "content": "[MASK]",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "5": {
+      "content": "[BOS]",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "6": {
+      "content": "[EOS]",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    }
+  },
+  "additional_special_tokens": [
     "[START_ID]",
     "[END_ID]",
     "[EOT]"
   ],
+  "bos_token": "[BOS]",
+  "chat_template": "{% for message in messages %}{{ bos_token if loop.first else '' }}{{ '[START_ID]' + message['role'] + '[END_ID]' }}\n{{ message['content'] }}{{ '[EOT]' if message['role'] == 'user' else eos_token }}{% endfor %}{% if add_generation_prompt %}{{ '[START_ID]' + 'assistant' + '[END_ID]' }}{% endif %}",
+  "clean_up_tokenization_spaces": false,
+  "cls_token": "[BOS]",
+  "eos_token": "[EOS]",
   "mask_token": "[MASK]",
   "model_max_length": 1024,
   "pad_token": "[EOS]",
-  "tokenizer_class": "TokenizersBackend",
+  "tokenizer_class": "PreTrainedTokenizerFast",
   "unk_token": "[UNK]"
 }
