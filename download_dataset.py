@@ -1,8 +1,9 @@
 import os
 from datasets import load_dataset
+from dotenv import load_dotenv; load_dotenv()
 
 dataset_name = "minhxthanh/Vietnam-History-200K-Vi"
-dataset_store_path = "G:\\hf\\vietnamese-history-qa"
+dataset_store_path = os.getenv("QA_DATA_PATH")
 
 def download_dataset():
     print(f"Starting download of dataset: {dataset_name}")
@@ -25,4 +26,4 @@ def download_dataset():
 
 
 if __name__ == "__main__":
-    download_dataset()
+    download_dataset()

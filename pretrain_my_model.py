@@ -32,7 +32,7 @@ class PretrainConfig:
     num_training_steps: int = 10000
 
     logging_steps: int = 1
-    checkpoint_interval: int = 1000
+    # checkpoint_interval: int = 1000
     max_grad_norm: float = 1.0
 
 # Start accelerator 

@@ -5,6 +5,7 @@ data/
 tokenized_vietnamese_book/
 checkpoints/
 my_experiment/
+.vscode/
 
 *.ipynb
 
