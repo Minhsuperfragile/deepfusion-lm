@@ -2,7 +2,7 @@ import os
 from datasets import load_dataset
 
 dataset_name = "minhxthanh/Vietnam-History-200K-Vi"
-dataset_store_path = "G:\\hf\\vietnamese-history-qa"
+dataset_store_path = "./data/vietnamese-history-qa"
 
 def download_dataset():
     print(f"Starting download of dataset: {dataset_name}")
@@ -25,4 +25,4 @@ def download_dataset():
 
 
 if __name__ == "__main__":
-    download_dataset()
+    download_dataset()
