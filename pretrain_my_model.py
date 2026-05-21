@@ -23,16 +23,16 @@ tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_PATH)
 
 @dataclass
 class PretrainConfig:
-    per_gpu_batch_size: int = 16
-    gradient_accumulation_steps: int = 4
-    learning_rate: float = 5e-5
-    weight_decay: float = 0.01
+    per_gpu_batch_size: int = 64
+    gradient_accumulation_steps: int = 1
+    learning_rate: float = 8e-4
+    weight_decay: float = 1e-5
     lr_scheduler_type: str = 'cosine'
-    num_warmup_steps: int = 1000
-    num_training_steps: int = 10000
+    num_warmup_steps: int = 4500
+    num_training_steps: int = 449000
 
     logging_steps: int = 1
-    # checkpoint_interval: int = 1000
+    checkpoint_interval: int = 15000
     max_grad_norm: float = 1.0
 
 # Start accelerator 
@@ -69,12 +69,15 @@ def collate_fn(batch):
 
 tokenized_data = load_from_disk(TOKENIZED_DATA_PATH)
 assert isinstance(tokenized_data, Dataset) , f"tokenized_data is {type(tokenized_data)}, expect a Dataset"
+tokenized_data = tokenized_data.shuffle(seed=42)
 
-train_dataloader = DataLoader(tokenized_data, 
+train_dataloader = DataLoader(tokenized_data,
                               batch_size=mini_batchsize,
-                              collate_fn=collate_fn, 
-                              shuffle=True,
-                              pin_memory=True) # Speed up data transfer to GPU
+                              collate_fn=collate_fn,
+                              num_workers=4,
+                              persistent_workers=True,
+                              multiprocessing_context="fork",
+                              pin_memory=True)
 
 optimizer = torch.optim.AdamW(model.parameters(), 
                               lr=pretrainc.learning_rate, 
@@ -181,21 +184,14 @@ while train:
                 
                 accelerator.log(log, step=completed_steps) 
             
-            # ### Checkpoint Model (Only need main process for this) ###
-            # if (completed_steps % pretrainc.checkpoint_interval == 0):
-                
-            #     ### Save Checkpoint ### 
-            #     path_to_checkpoint = os.path.join(path_to_experiment, f"checkpoint_{completed_steps}")
-
-            #     if accelerator.is_main_process:
-            #         progress_bar.write(f"Saving Checkpoint to {path_to_checkpoint}")
-
-            #     ### Make sure that all processes have caught up before saving checkpoint! ###
-            #     accelerator.wait_for_everyone()
-
-            #     ### Save checkpoint using only the main process ###
-            #     if accelerator.is_main_process:
-            #         accelerator.save_state(output_dir=path_to_checkpoint)
+            ### Checkpoint Model ###
+            if completed_steps > 0 and completed_steps % pretrainc.checkpoint_interval == 0:
+                path_to_checkpoint = os.path.join(path_to_experiment, f"checkpoint_{completed_steps}")
+                if accelerator.is_main_process:
+                    progress_bar.write(f"Saving Checkpoint to {path_to_checkpoint}")
+                accelerator.wait_for_everyone()
+                if accelerator.is_main_process:
+                    accelerator.save_state(output_dir=path_to_checkpoint)
             
             if completed_steps >= pretrainc.num_training_steps:
                 train = False
