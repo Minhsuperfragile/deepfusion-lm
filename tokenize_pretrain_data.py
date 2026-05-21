@@ -79,7 +79,7 @@ def prepare_tokenized_data():
         tokenize_and_chunk, 
         batched=True, 
         batch_size=1000,
-        num_proc=os.cpu_count(), # Use multiple CPU cores
+        num_proc=16, # Use multiple CPU cores
         remove_columns=dataset.column_names
     )
 

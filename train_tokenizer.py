@@ -1,7 +1,7 @@
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
-from tokenizers.pre_tokenizers import Whitespace
+from tokenizers.pre_tokenizers import Whitespace, Sequence, Punctuation
 from model import DeepfusionConfig
 import os
 
@@ -21,8 +21,24 @@ tokenizer.pre_tokenizer = Whitespace()
 # 3. Configure the Trainer
 trainer = BpeTrainer(
     vocab_size=CONFIG.vocab_size,
-    special_tokens=["[UNK]", "[START_ID]", "[END_ID]", "[EOT]", "[MASK]", "[BOS]", "[EOS]"] #EOS as PAD
+    special_tokens=["[UNK]", "[START_ID]", "[END_ID]", "[EOT]", "[MASK]", "[BOS]", "[EOS]"], #EOS as PAD
+    min_frequency=2
 )
+
+import regex as re
+import unicodedata
+
+def clean_vietnamese_text(text):
+    # 1. Force NFC Unicode normalization
+    text = unicodedata.normalize('NFC', text)
+    
+    # 2. Strip out completely non-Vietnamese/non-standard characters if necessary
+    # Keep Vietnamese letters, numbers, basic punctuation, and spaces
+    # Vietnamese extended range: àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ
+    allowed_chars = re.compile(r'[^a-zA-Z0-9àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸĐ\s.,!?()\"\'\-]')
+    text = allowed_chars.sub('', text)
+    
+    return text
 
 # 4. Define a Generator for Large-Scale Data Ingestion
 # This streams the text line-by-line, keeping memory usage minimal.
@@ -39,7 +55,7 @@ def get_training_corpus(path):
             # Example line in corpus: "L'algorithme dont nous parlons, ce qui optimise le flux, est rapide."
             for line in f:
                 if line.strip(): # Skip empty lines
-                    yield line
+                    yield clean_vietnamese_text(line)
 
 # 5. Train the Tokenizer
 corpus_path = os.getenv("CORPUS_PATH", "")

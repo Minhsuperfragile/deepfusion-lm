@@ -20,7 +20,7 @@ class DeepfusionConfig:
     ratio_global_window = 3
     pad_token : int = 0
     layer_norm_eps: float = 1e-5
-    num_heads: int = 64
+    num_heads: int = 12
     rope_base: int = 10_000
     max_seq_len: int = 1024 # Maximum context length
 
