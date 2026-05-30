@@ -6,6 +6,9 @@ tokenized_vietnamese_book/
 checkpoints/
 my_experiment/
 
+data/
+checkpoint-pretrained-with-history-qa/
+
 *.ipynb
 
 *.py[codz]

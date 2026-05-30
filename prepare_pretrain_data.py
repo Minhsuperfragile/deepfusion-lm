@@ -1,7 +1,7 @@
 from datasets import load_dataset, load_from_disk, concatenate_datasets, Dataset
 import time
 import argparse
-
+import os
 from tokenizer import get_tokenizer
 
 parser = argparse.ArgumentParser(description="Finemath Data Prep")
@@ -156,8 +156,6 @@ def prepare_data(args):
         chunk_size = 50000
         current_chunk = []
         chunk_idx = 0
-        
-        import os
         
         for ex in tokenized_stream:
             current_chunk.append(ex)
