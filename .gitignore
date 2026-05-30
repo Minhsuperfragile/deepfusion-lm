@@ -7,6 +7,9 @@ checkpoints/
 my_experiment/
 .vscode/
 
+data/
+checkpoint-pretrained-with-history-qa/
+
 *.ipynb
 
 *.py[codz]

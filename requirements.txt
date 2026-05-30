@@ -1,0 +1,12 @@
+torch
+transformers
+tokenizers
+datasets
+accelerate
+tqdm
+numpy
+python-dotenv
+safetensors
+sympy
+tensorboard
+wandb
