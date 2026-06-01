@@ -245,12 +245,12 @@ class DeepfusionLM(nn.Module):
         
         orig_window_size = config.sliding_attn_size
         for i in range(1, config.num_attn_layers):        
-            if i % config.ratio_global_window == 0:
-                config.sliding_attn_size = -1
-                config.rope_base = 160_000
-            else:
-                config.sliding_attn_size = orig_window_size
-                config.rope_base = 10_000
+            # if i % config.ratio_global_window == 0:
+            config.sliding_attn_size = -1 # All layers are full attention 
+            config.rope_base = 160_000
+            # else:
+            #     config.sliding_attn_size = orig_window_size
+            #     config.rope_base = 10_000
             
             self.attentions.append(DeepfusionAttentionLayer(config))
         
