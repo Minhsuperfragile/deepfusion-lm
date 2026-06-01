@@ -42,7 +42,7 @@ except (AttributeError, ValueError):
 _DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_TOKENIZER_PATH = os.path.join(_DIR, "DeepfusionLM_tokenizer")
 DEFAULT_CHECKPOINT_PATH = os.path.join(_DIR, "my_experiment", "checkpoint_sft_model")
-DEFAULT_DATA_PATH = os.path.join(_DIR, "data", "tokenized-sft")
+DEFAULT_DATA_PATH = "/mnt/data1/tm/deepfusion-lm/dataset/vhqa_sft_tokenized"
 
 
 def load_model_and_tokenizer(checkpoint_path, tokenizer_path, device):

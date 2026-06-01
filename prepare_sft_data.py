@@ -4,9 +4,9 @@ import time
 from transformers import PreTrainedTokenizerFast
 import argparse
 import os
-
+import pathlib
 TOKENIZER_PATH = os.path.join(os.path.dirname(__file__), "DeepfusionLM_tokenizer")
-DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "vietnamese-history-qa")
+DATA_PATH = pathlib.Path("/mnt/data1/tm/deepfusion-lm/dataset/vietnamese-history-qa")
 
 
 parser = argparse.ArgumentParser(description="Finemath Data Prep")
