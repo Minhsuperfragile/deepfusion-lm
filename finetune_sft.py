@@ -318,7 +318,7 @@ while train:
         attention_mask = torch.ones((batch_size, seq_len), dtype=torch.long, device=accelerator.device)
 
         ### Random sample t to mask each token with that probability ###
-        t = torch.rand(batch_size, 1, device=accelerator.device).expand(batch_size, seq_len).clamp_min(1e-5)
+        t = torch.rand(batch_size, 1, device=accelerator.device).expand(batch_size, seq_len).clamp_min(0.01)
         mask = torch.bernoulli(t)
 
         ### Mask only valid where it is not query ###

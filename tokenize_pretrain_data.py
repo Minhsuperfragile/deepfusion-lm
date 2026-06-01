@@ -31,7 +31,7 @@ def prepare_tokenized_data():
     if os.path.exists(tokenizer_path):
         tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
         # Ensure special tokens are recognized by the transformers wrapper
-        tokenizer.pad_token = "[EO]"
+        tokenizer.pad_token = "[EOS]"
         tokenizer.mask_token = "[MASK]"
         tokenizer.unk_token = "[UNK]"
         tokenizer.bos_token = "[BOS]"
