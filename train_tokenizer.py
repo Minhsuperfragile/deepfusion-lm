@@ -64,4 +64,4 @@ tokenizer.train_from_iterator(get_training_corpus(corpus_path), trainer=trainer)
 print("Training complete!")
 
 # 6. Save the Model
-tokenizer.save("DeepfusionLM_tokenizer.json")
+tokenizer.save(os.getenv("TOKENIZER_JSON_PATH", "DeepfusionLM_tokenizer.json"))

@@ -2,11 +2,14 @@ import os
 from datasets import load_dataset
 from transformers import PreTrainedTokenizerFast
 from model import DeepfusionConfig
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # 1. Configuration
-corpus_path = "G:\\hf\\vietnamese-book"
-tokenizer_path = "DeepfusionLM_tokenizer.json"
-output_path = "./tokenized_vietnamese_book"
+corpus_path = os.getenv("CORPUS_PATH", "G:\\hf\\vietnamese-book")
+tokenizer_path = os.getenv("TOKENIZER_JSON_PATH", "DeepfusionLM_tokenizer.json")
+output_path = os.getenv("PROCESSED_PRETRAIN_DATA_PATH", "./tokenized_vietnamese_book")
 
 # Load config to get the correct sequence length
 config = DeepfusionConfig()
@@ -52,4 +55,4 @@ tokenizer.chat_template = (
 )
 
 # Instead of saving just the JSON file
-tokenizer.save_pretrained("./DeepfusionLM_tokenizer")
+tokenizer.save_pretrained(os.getenv("TOKENIZER_PATH", "./DeepfusionLM_tokenizer"))

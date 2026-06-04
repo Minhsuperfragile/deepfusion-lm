@@ -16,6 +16,9 @@ from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn, Ti
 from rich.text import Text
 from safetensors.torch import load_file
 from transformers import PreTrainedTokenizerFast
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from model import DeepfusionConfig, DeepfusionLM
 
@@ -24,8 +27,8 @@ logging.getLogger("transformers").setLevel(logging.ERROR)
 
 ### Defaults pointing at this project ###
 _DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_TOKENIZER_PATH = os.path.join(_DIR, "DeepfusionLM_tokenizer")
-DEFAULT_CHECKPOINT_PATH = os.path.join(_DIR, "my_experiment", "checkpoint_sft_model")
+DEFAULT_TOKENIZER_PATH = os.getenv("TOKENIZER_PATH", os.path.join(_DIR, "DeepfusionLM_tokenizer"))
+DEFAULT_CHECKPOINT_PATH = os.getenv("INFERENCE_CHECKPOINT_PATH", os.path.join(_DIR, "my_experiment", "checkpoint_sft_model"))
 
 
 def load_model_and_tokenizer(checkpoint_path, tokenizer_path, device="cuda"):

@@ -31,6 +31,9 @@ import torch.nn.functional as F
 from transformers import PreTrainedTokenizerFast
 from safetensors.torch import load_file
 from tqdm import tqdm
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from model import DeepfusionConfig, DeepfusionLM
 
@@ -40,9 +43,9 @@ except (AttributeError, ValueError):
     pass
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_TOKENIZER_PATH = os.path.join(_DIR, "DeepfusionLM_tokenizer")
-DEFAULT_CHECKPOINT_PATH = os.path.join(_DIR, "my_experiment", "checkpoint_sft_model")
-DEFAULT_DATA_PATH = "/mnt/data1/tm/deepfusion-lm/dataset/vhqa_sft_tokenized"
+DEFAULT_TOKENIZER_PATH = os.getenv("TOKENIZER_PATH", os.path.join(_DIR, "DeepfusionLM_tokenizer"))
+DEFAULT_CHECKPOINT_PATH = os.getenv("EVALUATE_CHECKPOINT_PATH", os.path.join(_DIR, "my_experiment", "checkpoint_sft_model"))
+DEFAULT_DATA_PATH = os.getenv("EVALUATE_DATA_PATH", "/mnt/data1/tm/deepfusion-lm/dataset/vhqa_sft_tokenized")
 
 
 def load_model_and_tokenizer(checkpoint_path, tokenizer_path, device):

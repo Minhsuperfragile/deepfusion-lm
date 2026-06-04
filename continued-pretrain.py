@@ -11,18 +11,21 @@ from transformers import AutoTokenizer, get_scheduler
 from safetensors.torch import load_file
 from accelerate import Accelerator
 from tqdm import tqdm
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from model import DeepfusionConfig, DeepfusionLM
 
 @dataclass
 class ContinuedPretrainConfig:
     # Dataset and paths
-    dataset_path: str = "/mnt/data1/tm/deepfusion-lm/dataset/vietnamese-history-qa"
-    tokenized_dataset_path: str = "/mnt/data1/tm/deepfusion-lm/dataset/vietnamese-history-qa-tokenized"
-    model_weight_dir: str = "my_experiment/checkpoint_120000"
-    tokenizer_path: str = "DeepfusionLM_tokenizer"
-    experiment_name: str = "continued_pretrain"
-    working_directory: str = "my_experiment"
+    dataset_path: str = os.getenv("CONTINUED_PRETRAIN_RAW_DATA_PATH", "/mnt/data1/tm/deepfusion-lm/dataset/vietnamese-history-qa")
+    tokenized_dataset_path: str = os.getenv("CONTINUED_PRETRAIN_TOKENIZED_DATA_PATH", "/mnt/data1/tm/deepfusion-lm/dataset/vietnamese-history-qa-tokenized")
+    model_weight_dir: str = os.getenv("CONTINUED_PRETRAIN_MODEL_WEIGHT_DIR", "my_experiment/checkpoint_120000")
+    tokenizer_path: str = os.getenv("TOKENIZER_PATH", "DeepfusionLM_tokenizer")
+    experiment_name: str = os.getenv("CONTINUED_PRETRAIN_EXPERIMENT_NAME", "continued_pretrain")
+    working_directory: str = os.getenv("CONTINUED_PRETRAIN_WORKING_DIR", "my_experiment")
 
     # Training hyperparameters
     per_gpu_batch_size: int = 64

@@ -10,15 +10,18 @@ from datasets import load_from_disk
 from accelerate import Accelerator
 from safetensors.torch import load_file
 from tqdm import tqdm
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from model import DeepfusionConfig, DeepfusionLM
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
 _DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_TOKENIZER_PATH  = os.path.join(_DIR, "DeepfusionLM_tokenizer")
-DEFAULT_CHECKPOINT_PATH = os.path.join(_DIR, "checkpoint-pretrained-with-history-qa", "model.safetensors")
-DEFAULT_DATA_PATH       = os.path.join(_DIR, "data", "tokenized-sft")
-DEFAULT_OUTPUT_DIR      = os.path.join(_DIR, "sft_output")
+DEFAULT_TOKENIZER_PATH  = os.getenv("TOKENIZER_PATH", os.path.join(_DIR, "DeepfusionLM_tokenizer"))
+DEFAULT_CHECKPOINT_PATH = os.getenv("FINETUNE_PRETRAINED_CHECKPOINT_PATH", os.path.join(_DIR, "checkpoint-pretrained-with-history-qa", "model.safetensors"))
+DEFAULT_DATA_PATH       = os.getenv("FINETUNE_DATA_PATH", os.path.join(_DIR, "data", "tokenized-sft"))
+DEFAULT_OUTPUT_DIR      = os.getenv("FINETUNE_OUTPUT_DIR", os.path.join(_DIR, "sft_output"))
 
 
 def SFTCollator(tokenizer):

@@ -3,9 +3,12 @@ import torch
 from model import DeepfusionConfig, DeepfusionLM
 from safetensors.torch import load_file
 from transformers import PreTrainedTokenizerFast
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # 1. Load the tokenizer
-tokenizer_json_path = "DeepfusionLM_tokenizer.json"
+tokenizer_json_path = os.getenv("TOKENIZER_JSON_PATH", "DeepfusionLM_tokenizer.json")
 if not os.path.exists(tokenizer_json_path):
     tokenizer_json_path = "DeepfusionLM_tokenizer/tokenizer.json"
 
@@ -25,7 +28,7 @@ model = DeepfusionLM(config)
 
 # 3. Load the saved weights from your custom model's checkpoint directory
 # (Note: Loading the ModernBERT checkpoint into DeepfusionLM will cause key mismatch errors)
-checkpoint_path = "my_experiment/final_model/model.safetensors"
+checkpoint_path = os.getenv("MLM_INFERENCE_CHECKPOINT_PATH", "my_experiment/final_model/model.safetensors")
 
 if not os.path.exists(checkpoint_path):
     print(f"Warning: Checkpoint not found at '{checkpoint_path}'.")

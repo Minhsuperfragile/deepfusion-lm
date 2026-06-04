@@ -35,13 +35,13 @@ class PretrainConfig:
     max_grad_norm: float = 1.0
 
 # Start accelerator 
-checkpoint_dir = "./checkpoints"
+checkpoint_dir = os.getenv("PRETRAIN_CHECKPOINT_DIR", "./checkpoints")
 accelerator = Accelerator(
     project_dir=checkpoint_dir,
     log_with="tensorboard",
     mixed_precision="fp16" # Enable mixed precision for faster training on CUDA
 )
-path_to_experiment = "my_experiment"
+path_to_experiment = os.getenv("PRETRAIN_EXPERIMENT_DIR", "my_experiment")
 accelerator.init_trackers(path_to_experiment)
 # accelerator.log(
 #     {
