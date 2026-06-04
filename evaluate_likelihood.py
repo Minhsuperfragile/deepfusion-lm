@@ -200,3 +200,16 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# ========================================================
+#   Examples scored          : 1000  (skipped 0)
+#   Total response tokens    : 50207
+#   Monte Carlo draws (n_mc) : 128
+# --------------------------------------------------------
+#   Mean per-example LL      :  -233.5341   (higher = better)
+#   Mean per-token NLL       :     4.6514   (lower = better)
+#   Corpus perplexity        :   104.7342   (lower = better)
+# ========================================================
+
+# Note: this is the low-variance Eq.(6) metric, not the training loss.
+# Perplexity ~ vocab size means near-random; single-digit is strong.
